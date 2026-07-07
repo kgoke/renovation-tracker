@@ -42,18 +42,6 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
 
-      - name: Probe expo autolinking mirror command
-        working-directory: android
-        run: |
-          node --version
-          set +e
-          node --no-warnings --eval "require('expo/bin/autolinking')" expo-modules-autolinking \
-            mirror-kotlin-inline-modules \
-            --kotlin-files-mirror-directory "$GITHUB_WORKSPACE/node_modules/expo/android/src/main/java/inline/modules" \
-            --inline-modules-list-directory "$GITHUB_WORKSPACE/node_modules/expo/android/build/inline/modules" \
-            --watched-directories-serialized "[]"
-          echo "probe exit code: $?"
-
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
@@ -67,7 +55,7 @@ jobs:
           # Provide the JSON the CLI would pass.
           echo "expo.inlineModules.watchedDirectories=[]" >> android/gradle.properties
           cd android
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease
 
       - name: Collect APK
         run: cp android/app/build/outputs/apk/release/app-release.apk renovation-tracker.apk
