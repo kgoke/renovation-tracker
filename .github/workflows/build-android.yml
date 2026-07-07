@@ -50,7 +50,7 @@ jobs:
           # Give Gradle more headroom than the template default (last key wins).
           echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --stacktrace
 
       - name: Collect APK
         run: cp android/app/build/outputs/apk/release/app-release.apk renovation-tracker.apk
