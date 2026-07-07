@@ -61,6 +61,11 @@ jobs:
         run: |
           # Give Gradle more headroom than the template default (last key wins).
           echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+          # The expo autolinking plugin passes a raw Kotlin emptyList() to its
+          # inline-modules exec when this property is unset (the Expo CLI
+          # normally sets it), which breaks the node command under Gradle 9.
+          # Provide the JSON the CLI would pass.
+          echo "expo.inlineModules.watchedDirectories=[]" >> android/gradle.properties
           cd android
           ./gradlew assembleRelease --stacktrace
 
