@@ -41,6 +41,20 @@ app-private image files.
 - expo-image-picker + expo-file-system (photos persisted to app storage)
 - react-native-svg (charts)
 
+## Install on your phone (no tools needed)
+
+Every push builds an APK on GitHub Actions and publishes it to the
+[**latest** release](../../releases/latest):
+
+1. On your Android phone, open the repo's **Releases** page and download
+   `renovation-tracker.apk` (log in to GitHub if the repo is private).
+2. Open the downloaded file and allow installing from your browser when
+   Android asks.
+
+You can also grab the APK from any run on the **Actions** tab (artifact
+`renovation-tracker-apk`). Builds are debug-signed — fine for sideloading;
+generate a proper keystore before any Play Store release.
+
 ## Running it
 
 ```bash
