@@ -130,6 +130,8 @@ export interface Receipt {
   vendor: string;
   receiptDate: string;
   totalCents: number;
+  subtotalCents: number;
+  taxCents: number;
   ocrText: string;
   status: ReceiptStatus;
   createdAt: string;
@@ -141,6 +143,9 @@ export interface ReceiptItem {
   description: string;
   quantity: number;
   amountCents: number;
+  taxCents: number;
+  projectId: number | null;
+  roomId: number | null;
   expenseId: number | null;
 }
 

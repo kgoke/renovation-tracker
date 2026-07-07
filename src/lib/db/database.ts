@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'renovation-tracker.db';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /**
  * Runs on app start via <SQLiteProvider onInit={migrateDb}>. Versioned with
@@ -71,6 +71,8 @@ export async function migrateDb(db: SQLiteDatabase): Promise<void> {
         vendor TEXT NOT NULL DEFAULT '',
         receipt_date TEXT NOT NULL DEFAULT '',
         total_cents INTEGER NOT NULL DEFAULT 0,
+        subtotal_cents INTEGER NOT NULL DEFAULT 0,
+        tax_cents INTEGER NOT NULL DEFAULT 0,
         ocr_text TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -122,6 +124,9 @@ export async function migrateDb(db: SQLiteDatabase): Promise<void> {
         description TEXT NOT NULL,
         quantity REAL NOT NULL DEFAULT 1,
         amount_cents INTEGER NOT NULL DEFAULT 0,
+        tax_cents INTEGER NOT NULL DEFAULT 0,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
         expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL
       );
 
@@ -144,6 +149,15 @@ export async function migrateDb(db: SQLiteDatabase): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_loans_property ON loans(property_id);
       CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt ON receipt_items(receipt_id);
       CREATE INDEX IF NOT EXISTS idx_room_photos_room ON room_photos(room_id);
+    `);
+  } else if (current < 2) {
+    // v1 -> v2: receipt tax tracking + per-item project/room assignment.
+    await db.execAsync(`
+      ALTER TABLE receipts ADD COLUMN subtotal_cents INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE receipts ADD COLUMN tax_cents INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE receipt_items ADD COLUMN tax_cents INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE receipt_items ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+      ALTER TABLE receipt_items ADD COLUMN room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL;
     `);
   }
 

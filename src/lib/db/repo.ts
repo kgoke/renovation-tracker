@@ -134,6 +134,8 @@ function mapReceipt(r: Row): Receipt {
     vendor: s(r.vendor),
     receiptDate: s(r.receipt_date),
     totalCents: n(r.total_cents),
+    subtotalCents: n(r.subtotal_cents),
+    taxCents: n(r.tax_cents),
     ocrText: s(r.ocr_text),
     status: s(r.status) as Receipt['status'],
     createdAt: s(r.created_at),
@@ -147,6 +149,9 @@ function mapReceiptItem(r: Row): ReceiptItem {
     description: s(r.description),
     quantity: n(r.quantity),
     amountCents: n(r.amount_cents),
+    taxCents: n(r.tax_cents),
+    projectId: nOrNull(r.project_id),
+    roomId: nOrNull(r.room_id),
     expenseId: nOrNull(r.expense_id),
   };
 }
@@ -438,6 +443,16 @@ export interface ReceiptDraftItem {
   amountCents: number;
 }
 
+/** A reviewed line item ready to become an expense. */
+export interface ReceiptFinalItem {
+  description: string;
+  quantity: number;
+  amountCents: number;
+  taxCents: number;
+  projectId: number | null;
+  roomId: number | null;
+}
+
 export async function listReceiptsForProperty(db: SQLiteDatabase, propertyId: number): Promise<Receipt[]> {
   const rows = await db.getAllAsync<Row>(
     'SELECT * FROM receipts WHERE property_id = ? ORDER BY created_at DESC',
@@ -473,6 +488,8 @@ export async function insertReceiptDraft(
     vendor: string;
     receiptDate: string;
     totalCents: number;
+    subtotalCents: number;
+    taxCents: number;
     ocrText: string;
     items: ReceiptDraftItem[];
   }
@@ -480,9 +497,10 @@ export async function insertReceiptDraft(
   let receiptId = 0;
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      `INSERT INTO receipts (image_uri, vendor, receipt_date, total_cents, ocr_text, status)
-       VALUES (?, ?, ?, ?, ?, 'pending')`,
-      draft.imageUri, draft.vendor, draft.receiptDate, draft.totalCents, draft.ocrText
+      `INSERT INTO receipts (image_uri, vendor, receipt_date, total_cents, subtotal_cents, tax_cents, ocr_text, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      draft.imageUri, draft.vendor, draft.receiptDate, draft.totalCents, draft.subtotalCents,
+      draft.taxCents, draft.ocrText
     );
     receiptId = res.lastInsertRowId;
     for (const item of draft.items) {
@@ -498,42 +516,56 @@ export async function insertReceiptDraft(
 /**
  * Finalize a reviewed receipt: update its header, replace its items, create
  * one expense per item, and mark the receipt processed — atomically.
+ *
+ * Each item may point at its own project/room (split receipts); the expense
+ * amount includes the item's allocated share of sales tax so property and
+ * project totals reflect real money spent.
  */
 export async function processReceipt(
   db: SQLiteDatabase,
   receiptId: number,
   header: {
     propertyId: number;
-    projectId: number | null;
-    roomId: number | null;
+    projectId: number | null; // receipt-level default (whole-receipt mode)
     vendor: string;
     receiptDate: string;
     totalCents: number;
+    subtotalCents: number;
+    taxCents: number;
     category: ExpenseCategory;
   },
-  items: ReceiptDraftItem[]
+  items: ReceiptFinalItem[]
 ): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE receipts SET property_id = ?, project_id = ?, vendor = ?, receipt_date = ?, total_cents = ?,
-         status = 'processed' WHERE id = ?`,
-      header.propertyId, header.projectId, header.vendor, header.receiptDate, header.totalCents, receiptId
+         subtotal_cents = ?, tax_cents = ?, status = 'processed' WHERE id = ?`,
+      header.propertyId, header.projectId, header.vendor, header.receiptDate, header.totalCents,
+      header.subtotalCents, header.taxCents, receiptId
     );
     await db.runAsync('DELETE FROM receipt_items WHERE receipt_id = ?', receiptId);
     for (const item of items) {
+      const notes = item.taxCents !== 0 ? `Includes ${centsLabel(item.taxCents)} sales tax` : '';
       const expenseRes = await db.runAsync(
         `INSERT INTO expenses (property_id, project_id, room_id, receipt_id, description, category, vendor,
            amount_cents, expense_date, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
-        header.propertyId, header.projectId, header.roomId, receiptId, item.description, header.category,
-        header.vendor, item.amountCents, header.receiptDate
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        header.propertyId, item.projectId, item.roomId, receiptId, item.description, header.category,
+        header.vendor, item.amountCents + item.taxCents, header.receiptDate, notes
       );
       await db.runAsync(
-        'INSERT INTO receipt_items (receipt_id, description, quantity, amount_cents, expense_id) VALUES (?, ?, ?, ?, ?)',
-        receiptId, item.description, item.quantity, item.amountCents, expenseRes.lastInsertRowId
+        `INSERT INTO receipt_items (receipt_id, description, quantity, amount_cents, tax_cents, project_id, room_id, expense_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        receiptId, item.description, item.quantity, item.amountCents, item.taxCents,
+        item.projectId, item.roomId, expenseRes.lastInsertRowId
       );
     }
   });
+}
+
+function centsLabel(cents: number): string {
+  const abs = Math.abs(cents);
+  return `$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
 }
 
 export async function deleteReceipt(db: SQLiteDatabase, id: number): Promise<void> {

@@ -25,9 +25,13 @@ app-private image files.
   rate, term, payment) with a simple annual-interest estimate.
 - **Receipt scanning** — photograph a receipt (or pick from the gallery); text
   is read **on-device with ML Kit OCR**, then a heuristic parser pre-fills
-  vendor, date, total, and line items. Review, correct, assign to
-  property/project/room, and every line item becomes an expense linked back to
-  the stored receipt image.
+  vendor, date, line items, subtotal, tax, and total. The review screen
+  reconciles items against the subtotal/total, **spreads sales tax across
+  items proportionally** (explicit tax line, or derived from total − pre-tax
+  amount), and lets you assign **each line item to its own project and room**
+  — or flip one switch to put the whole receipt toward a single project.
+  Every line item becomes an expense (tax included) linked back to the stored
+  receipt image.
 - **Dashboards** — portfolio totals (all-in cost, renovation spend, carrying
   costs), per-property budget bars, category donuts, monthly spend chart, and
   recent activity.

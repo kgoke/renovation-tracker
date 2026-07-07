@@ -35,6 +35,8 @@ export default function ScanScreen() {
         vendor: parsed?.vendor ?? '',
         receiptDate: parsed?.date ?? todayIso(),
         totalCents: parsed?.totalCents ?? 0,
+        subtotalCents: parsed?.subtotalCents ?? 0,
+        taxCents: parsed?.taxCents ?? 0,
         ocrText: ocr?.text ?? '',
         items: (parsed?.items ?? []).map((item) => ({
           description: item.description,
